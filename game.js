@@ -256,13 +256,30 @@ const collisionDetection = () => {
     for (let c = 0; c < brick.columnCount; c++) {
       let b = bricks[c][r];
       if (b.status) {
+        // Provjera sudara
         if (
           ball.x + ball.radius > b.x &&
           ball.x - ball.radius < b.x + brick.width &&
           ball.y + ball.radius > b.y &&
           ball.y - ball.radius < b.y + brick.height
         ) {
-          ball.jumpY = -ball.jumpY;
+          // Racunanje pozicija sudara cigle i loptice
+          let overlapLeft = ball.x + ball.radius - b.x;
+          let overlapRight = b.x + brick.width - (ball.x - ball.radius);
+          let overlapTop = ball.y + ball.radius - b.y;
+          let overlapBottom = b.y + brick.height - (ball.y - ball.radius);
+
+          // Nadi minimalno preklapanje
+          let minOverlapX = Math.min(overlapLeft, overlapRight);
+          let minOverlapY = Math.min(overlapTop, overlapBottom);
+
+          // Promijeni smjer na osnovu minimalnog preklapanja
+          if (minOverlapX < minOverlapY) {
+            ball.jumpX = -ball.jumpX; // Promijeni horizontalnu brzinu
+          } else {
+            ball.jumpY = -ball.jumpY; // Promijeni vertikalnu brzinu
+          }
+
           b.status = 0;
           score += 1;
           if (score > maxScore) {
