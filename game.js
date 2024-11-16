@@ -2,12 +2,12 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// Postavljanje veličine Canvasa na veličinu prozora preglednika
+// Postavljanje velicine Canvasa na velicinu prozora preglednika
 canvas.width = window.innerWidth - 4; // Zbog bordera
 canvas.height = window.innerHeight - 4; // Također zbog bordera
 
-// Težina igre - širina palice
-// Mijenjat će se pritiskom na tipke B(easy) N(normal) M(hard)
+// Tezina igre - sirina palice
+// Mijenjat ce se pritiskom na tipke B(easy) N(normal) M(hard)
 const DIFFICULTY = {
   EASY: 300,
   NORMAL: 150,
@@ -40,14 +40,14 @@ const ball = {
 const brick = {
   rowCount: 5,
   columnCount: 6,
-  width: 0, // Izračunat ćemo dinamički
-  height: 30,
+  width: 0, // Izracunat cemo dinamicki
+  height: 35,
   padding: 1,
   offsetTop: 30,
   offsetLeft: 0,
 };
 
-// Izračunavanje širine cigli kako bismo prekrili cijeli ekran
+// Izracunavanje sirine cigli kako bismo prekrili cijeli ekran
 brick.width =
   (canvas.width - brick.padding * (brick.columnCount - 1)) / brick.columnCount;
 
@@ -69,10 +69,8 @@ let rightPressed = false;
 let leftPressed = false;
 // Varijabla za kontrolu ponašanja unutar testing mode-a
 let testingMode = false;
-
-// Slušatelji događaja za tipke
-document.addEventListener("keyup", (e) => keyUpHandler(e));
-document.addEventListener("keydown", (e) => keyDownHandler(e));
+// Varijabla za praćenje stanja Shift tipke
+let shiftPressed = false;
 
 const keyDownHandler = (e) => {
   // Pomak palice
@@ -101,7 +99,7 @@ const keyDownHandler = (e) => {
     testingMode = true;
   }
 
-  // Dodavanje funkcionalnosti promjene težine igre - želimo spriječiti u slučaju da je uključen testing mode
+  // Dodavanje funkcionalnosti promjene tezine igre - zelimo sprijeciti u slucaju da je ukljucen testing mode
   if ((e.key === "B" || e.key === "b") && !testingMode) {
     paddle.width = DIFFICULTY.EASY;
   }
@@ -112,8 +110,9 @@ const keyDownHandler = (e) => {
     paddle.width = DIFFICULTY.HARD;
   }
 
-  //   Ubrzanje palice kad se drzi tipka shift
-  if (e.key === "Shift") {
+  // Ubrzanje palice kad se drži tipka Shift
+  if (e.key === "Shift" && !shiftPressed) {
+    shiftPressed = true;
     paddle.speed += 15;
   }
 };
@@ -136,19 +135,24 @@ const keyUpHandler = (e) => {
     ball.jumpY /= 2;
   }
 
-  //   Uspori palicu kad pustis shift
+  // Uspori palicu kad pustis Shift
   if (e.key === "Shift") {
+    shiftPressed = false;
     paddle.speed -= 15;
   }
 };
 
-// Funkcija za prilagođavanje svjetline HSL boje
+// Slusatelji dogadaja za tipke
+document.addEventListener("keyup", keyUpHandler);
+document.addEventListener("keydown", keyDownHandler);
+
+// Funkcija za prilagodavanje svjetline HSL boje
 const adjustColorBrightness = (color, percent) => {
   let l = color.l + percent;
   if (l > 100) l = 100;
   if (l < 0) l = 0;
 
-  // Vraćamo HSL string s novom svjetlinom
+  // Vracamo HSL string s novom svjetlinom
   return `hsl(${color.h}, ${color.s}%, ${l}%)`;
 };
 
@@ -158,7 +162,7 @@ const getBrickColor = (row) => {
   return { h: 240, s: 100, l: lightnessValues[row] };
 };
 
-// Funkcija za crtanje palice s efektom sjenčanja
+// Funkcija za crtanje palice s efektom sjencanja
 const drawPaddle = () => {
   // Konvertiranje boje u HSL string
   const baseColor = `hsl(${paddle.color.h}, ${paddle.color.s}%, ${paddle.color.l}%)`;
@@ -188,7 +192,7 @@ const drawBall = () => {
   ctx.closePath();
 };
 
-// Funkcija za crtanje cigli s efektom sjenčanja
+// Funkcija za crtanje cigli s efektom sjencanja
 const drawBricks = () => {
   for (let r = 0; r < brick.rowCount; r++) {
     for (let c = 0; c < brick.columnCount; c++) {
@@ -247,11 +251,10 @@ const drawTutorial = () => {
   );
 };
 
-// Varijabla za praćenje stanja igre
 let gameOver = false;
 
 // Funkcija za detekciju kolizije
-const collisionDetection = () => {
+const collisionDetection = (prevX, prevY) => {
   for (let r = 0; r < brick.rowCount; r++) {
     for (let c = 0; c < brick.columnCount; c++) {
       let b = bricks[c][r];
@@ -263,21 +266,32 @@ const collisionDetection = () => {
           ball.y + ball.radius > b.y &&
           ball.y - ball.radius < b.y + brick.height
         ) {
-          // Racunanje pozicija sudara cigle i loptice
-          let overlapLeft = ball.x + ball.radius - b.x;
-          let overlapRight = b.x + brick.width - (ball.x - ball.radius);
-          let overlapTop = ball.y + ball.radius - b.y;
-          let overlapBottom = b.y + brick.height - (ball.y - ball.radius);
+          // Odredi s koje strane je došlo do sudara koristeci prethodnu poziciju
+          let collidedFromLeft = prevX + ball.radius <= b.x;
+          let collidedFromRight = prevX - ball.radius >= b.x + brick.width;
+          let collidedFromTop = prevY + ball.radius <= b.y;
+          let collidedFromBottom = prevY - ball.radius >= b.y + brick.height;
 
-          // Nadi minimalno preklapanje
-          let minOverlapX = Math.min(overlapLeft, overlapRight);
-          let minOverlapY = Math.min(overlapTop, overlapBottom);
-
-          // Promijeni smjer na osnovu minimalnog preklapanja
-          if (minOverlapX < minOverlapY) {
-            ball.jumpX = -ball.jumpX; // Promijeni horizontalnu brzinu
+          if (collidedFromLeft) {
+            // Sudar s lijeve strane
+            ball.x = b.x - ball.radius;
+            ball.jumpX = -ball.jumpX;
+          } else if (collidedFromRight) {
+            // Sudar s desne strane
+            ball.x = b.x + brick.width + ball.radius;
+            ball.jumpX = -ball.jumpX;
+          } else if (collidedFromTop) {
+            // Sudar odozgo
+            ball.y = b.y - ball.radius;
+            ball.jumpY = -ball.jumpY;
+          } else if (collidedFromBottom) {
+            // Sudar odozdo
+            ball.y = b.y + brick.height + ball.radius;
+            ball.jumpY = -ball.jumpY;
           } else {
-            ball.jumpY = -ball.jumpY; // Promijeni vertikalnu brzinu
+            // Ako ne mozemo odrediti stranu, promijenimo oba smjera
+            ball.jumpX = -ball.jumpX;
+            ball.jumpY = -ball.jumpY;
           }
 
           b.status = 0;
@@ -290,13 +304,16 @@ const collisionDetection = () => {
             drawWinMessage();
             gameOver = true;
           }
+
+          return true; // Sudar se dogodio
         }
       }
     }
   }
+  return false; // Nije bilo sudara
 };
 
-// Funkcija za ažuriranje pozicija
+// Funkcija za update pozicija
 const update = () => {
   // Pomicanje palice
   if (leftPressed && paddle.x > 0) {
@@ -306,42 +323,77 @@ const update = () => {
   }
 
   // Ograničavanje brzine loptice
-  if (Math.abs(ball.jumpX) > ball.maxSpeed) {
-    ball.jumpX = ball.maxSpeed * Math.sign(ball.jumpX);
-  }
-  if (Math.abs(ball.jumpY) > ball.maxSpeed) {
-    ball.jumpY = ball.maxSpeed * Math.sign(ball.jumpY);
+  let speed = Math.sqrt(ball.jumpX * ball.jumpX + ball.jumpY * ball.jumpY);
+  if (speed > ball.maxSpeed) {
+    let scale = ball.maxSpeed / speed;
+    ball.jumpX *= scale;
+    ball.jumpY *= scale;
   }
 
-  // Pomicanje loptice
-  ball.x += ball.jumpX;
-  ball.y += ball.jumpY;
+  // Podjela kretanja loptice na manje korake
+  let steps = Math.ceil(speed / 5);
+  let stepX = ball.jumpX / steps;
+  let stepY = ball.jumpY / steps;
 
-  // Detekcija kolizije loptice sa zidovima
-  if (ball.x - ball.radius < 0 || ball.x + ball.radius > canvas.width) {
-    ball.jumpX = -ball.jumpX;
-  }
-  //Odbijanje od gornjeg ruba
-  if (ball.y - ball.radius < 0) {
-    ball.jumpY = -ball.jumpY;
-  } else if (ball.y + ball.radius > canvas.height) {
-    // Sudar s donjim rubom ekrana
-    //Ako se nalazi u podrucju palice..
-    if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
-      // Generiranje nasumičnog kuta između -60 i 60 stupnjeva
-      let angle = (Math.random() * 120 - 60) * (Math.PI / 180);
-      let speed = Math.sqrt(ball.jumpX * ball.jumpX + ball.jumpY * ball.jumpY);
+  let collisionHappened = false;
 
-      // Ažuriranje brzina na temelju nasumičnog kuta
-      ball.jumpX = speed * Math.sin(angle);
-      ball.jumpY = -Math.abs(speed * Math.cos(angle));
-    } else {
-      drawGameOverMessage();
-      gameOver = true;
+  for (let i = 0; i < steps; i++) {
+    // Sacuvaj prethodnu poziciju loptice
+    let prevX = ball.x;
+    let prevY = ball.y;
+
+    // Pomicanje loptice po malom koraku
+    ball.x += stepX;
+    ball.y += stepY;
+
+    // Detekcija kolizije loptice sa zidovima
+    if (ball.x - ball.radius < 0) {
+      ball.x = ball.radius;
+      ball.jumpX = -ball.jumpX;
+      stepX = -stepX; // Azuriraj stepX nakon promjene smjera
+    } else if (ball.x + ball.radius > canvas.width) {
+      ball.x = canvas.width - ball.radius;
+      ball.jumpX = -ball.jumpX;
+      stepX = -stepX;
+    }
+
+    if (ball.y - ball.radius < 0) {
+      ball.y = ball.radius;
+      ball.jumpY = -ball.jumpY;
+      stepY = -stepY; // Azuriraj stepY nakon promjene smjera
+    } else if (ball.y + ball.radius > canvas.height) {
+      // Sudar s donjim rubom ekrana
+      if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
+        // Izrazunaj relativnu poziciju udarca na palici (-1 do 1)
+        let relativeHitPosition = (ball.x - paddle.x) / paddle.width - 0.5;
+        relativeHitPosition *= 2;
+
+        // Postavi maksimalnu horizontalnu brzinu
+        let maxHorizontalSpeed = ball.maxSpeed;
+
+        // Azuriraj horizontalnu brzinu loptice na temelju pozicije udarca
+        ball.jumpX = relativeHitPosition * maxHorizontalSpeed;
+        stepX = ball.jumpX / steps;
+
+        // Odrzavaj konstantnu vertikalnu brzinu prema gore
+        ball.jumpY = -Math.abs(ball.jumpY);
+        stepY = ball.jumpY / steps;
+        ball.y = canvas.height - paddle.height - ball.radius; // Postavi lopticu iznad palice
+      } else {
+        drawGameOverMessage();
+        gameOver = true;
+        break;
+      }
+    }
+
+    // Detekcija sudara sa ciglama unutar svakog koraka
+    collisionHappened = collisionDetection(prevX, prevY);
+
+    if (collisionHappened || gameOver) {
+      // Ako je došlo do sudara, prekinemo daljnje pomake u ovom frame-u
+      break;
     }
   }
-
-  collisionDetection();
 };
 
 // Funkcija za crtanje
@@ -382,7 +434,7 @@ const loop = () => {
   if (!gameOver) {
     draw();
     update();
-    //Konstantno crtaj novi frame
+    // Konstantno crtaj novi frame
     requestAnimationFrame(loop);
   }
 };
