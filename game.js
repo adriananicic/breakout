@@ -81,7 +81,51 @@ let testingMode = false;
 // Varijabla za praćenje stanja Shift tipke
 let shiftPressed = false;
 
+// Funkcija za resetiranje igre
+const resetGame = () => {
+  // Resetiranje varijabli igre
+  gameOver = false;
+  score = 0;
+  testingMode = false;
+  shiftPressed = false;
+  leftPressed = false;
+  rightPressed = false;
+
+  // Resetiranje palice
+  paddle.width = DIFFICULTY.NORMAL;
+  paddle.x = (canvas.width - paddle.width) / 2;
+  paddle.y = canvas.height - paddle.height;
+  paddle.speed = 15;
+
+  // Resetiranje loptice
+  ball.x = canvas.width / 2;
+  ball.y = canvas.height - 30;
+  ball.speed = initialSpeed;
+  const angle = Math.PI / 4; // 45 stupnjeva
+  ball.jumpX = ball.speed * Math.cos(angle);
+  ball.jumpY = -ball.speed * Math.sin(angle);
+
+  // Resetiranje cigli
+  bricks = [];
+  for (let c = 0; c < brick.columnCount; c++) {
+    bricks[c] = [];
+    for (let r = 0; r < brick.rowCount; r++) {
+      bricks[c][r] = { x: 0, y: 0, status: 1 };
+    }
+  }
+
+  // Ponovno pokretanje petlje igre
+  loop();
+};
+
+// Funkcija za rukovanje događajima pritiska tipki
 const keyDownHandler = (e) => {
+  // Provjera je li igra završena i je li pritisnut Enter
+  if (e.key === "Enter" && gameOver) {
+    resetGame();
+    return; // Izlazimo iz funkcije nakon resetiranja
+  }
+
   // Pomak palice
   if (e.key === "Right" || e.key === "ArrowRight") {
     rightPressed = true;
@@ -418,6 +462,14 @@ const drawWinMessage = () => {
     canvas.width / 2,
     canvas.height / 2
   );
+
+  // Dodavanje upute za ponovno pokretanje
+  ctx.font = "30px Arial";
+  ctx.fillText(
+    "Pritisnite Enter za ponovno pokretanje igre",
+    canvas.width / 2,
+    canvas.height / 2 + 50
+  );
 };
 
 // Funkcija za prikaz poruke o gubitku
@@ -427,6 +479,14 @@ const drawGameOverMessage = () => {
   ctx.textAlign = "center";
   ctx.fillStyle = "white";
   ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+
+  // Dodavanje upute za ponovno pokretanje
+  ctx.font = "30px Arial";
+  ctx.fillText(
+    "Pritisnite Enter za ponovno pokretanje igre",
+    canvas.width / 2,
+    canvas.height / 2 + 50
+  );
 };
 
 // Funkcija glavne petlje
