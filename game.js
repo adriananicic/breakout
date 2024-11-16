@@ -2,12 +2,12 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// Postavljanje velicine Canvasa na velicinu prozora preglednika
+// Postavljanje veličine Canvasa na veličinu prozora preglednika
 canvas.width = window.innerWidth - 4; // Zbog bordera
 canvas.height = window.innerHeight - 4; // Također zbog bordera
 
-// Tezina igre - sirina palice
-// Mijenjat ce se pritiskom na tipke B(easy) N(normal) M(hard)
+// Težina igre - širina palice
+// Mijenjat će se pritiskom na tipke B(easy) N(normal) M(hard)
 const DIFFICULTY = {
   EASY: 300,
   NORMAL: 150,
@@ -25,29 +25,38 @@ const paddle = {
 };
 
 // Varijable loptice
+const initialSpeed = 8; // Početna brzina loptice
 const ball = {
   x: canvas.width / 2,
   y: canvas.height - 30,
   radius: 12,
-  speed: 4,
-  jumpX: 4 * (Math.random() * 2 - 1),
-  jumpY: -8,
+  speed: initialSpeed,
+  jumpX: initialSpeed * Math.cos(Math.PI / 4), // 45 stupnjeva
+  jumpY: -initialSpeed * Math.sin(Math.PI / 4),
   color: "green",
   maxSpeed: 16, // Maksimalna brzina loptice
+};
+
+// Funkcija za normalizaciju brzine loptice
+const normalizeBallSpeed = () => {
+  let speed = Math.sqrt(ball.jumpX * ball.jumpX + ball.jumpY * ball.jumpY);
+  let scale = ball.speed / speed;
+  ball.jumpX *= scale;
+  ball.jumpY *= scale;
 };
 
 // Varijable cigli
 const brick = {
   rowCount: 5,
   columnCount: 6,
-  width: 0, // Izracunat cemo dinamicki
+  width: 0, // Izračunat ćemo dinamički
   height: 35,
   padding: 1,
   offsetTop: 30,
   offsetLeft: 0,
 };
 
-// Izracunavanje sirine cigli kako bismo prekrili cijeli ekran
+// Izračunavanje širine cigli kako bismo prekrili cijeli ekran
 brick.width =
   (canvas.width - brick.padding * (brick.columnCount - 1)) / brick.columnCount;
 
@@ -81,25 +90,22 @@ const keyDownHandler = (e) => {
   }
 
   // Ubrzanje loptice
-  if (
-    e.key === " " &&
-    Math.abs(ball.jumpX) < ball.maxSpeed &&
-    Math.abs(ball.jumpY) < ball.maxSpeed
-  ) {
-    ball.jumpX *= 2;
-    ball.jumpY *= 2;
+  if (e.key === " " && ball.speed < ball.maxSpeed) {
+    ball.speed *= 2;
+    normalizeBallSpeed();
   }
 
   // Pokretanje testing moda
   if (e.key === "t" || e.key === "T") {
     paddle.width = canvas.width; // Palica preko cijelog ekrana
     paddle.x = 0;
-    ball.jumpX *= 2;
-    ball.jumpY *= 2;
+    ball.speed *= 2;
+    if (ball.speed > ball.maxSpeed) ball.speed = ball.maxSpeed;
+    normalizeBallSpeed();
     testingMode = true;
   }
 
-  // Dodavanje funkcionalnosti promjene tezine igre - zelimo sprijeciti u slucaju da je ukljucen testing mode
+  // Dodavanje funkcionalnosti promjene težine igre - želimo spriječiti u slučaju da je uključen testing mode
   if ((e.key === "B" || e.key === "b") && !testingMode) {
     paddle.width = DIFFICULTY.EASY;
   }
@@ -126,33 +132,29 @@ const keyUpHandler = (e) => {
   }
 
   // Usporavanje loptice
-  if (
-    e.key === " " &&
-    Math.abs(ball.jumpX) > ball.speed &&
-    Math.abs(ball.jumpY) > ball.speed
-  ) {
-    ball.jumpX /= 2;
-    ball.jumpY /= 2;
+  if (e.key === " " && ball.speed > initialSpeed) {
+    ball.speed /= 2;
+    normalizeBallSpeed();
   }
 
-  // Uspori palicu kad pustis Shift
+  // Uspori palicu kad pustiš Shift
   if (e.key === "Shift") {
     shiftPressed = false;
     paddle.speed -= 15;
   }
 };
 
-// Slusatelji dogadaja za tipke
+// Slušatelji događaja za tipke
 document.addEventListener("keyup", keyUpHandler);
 document.addEventListener("keydown", keyDownHandler);
 
-// Funkcija za prilagodavanje svjetline HSL boje
+// Funkcija za prilagođavanje svjetline HSL boje
 const adjustColorBrightness = (color, percent) => {
   let l = color.l + percent;
   if (l > 100) l = 100;
   if (l < 0) l = 0;
 
-  // Vracamo HSL string s novom svjetlinom
+  // Vraćamo HSL string s novom svjetlinom
   return `hsl(${color.h}, ${color.s}%, ${l}%)`;
 };
 
@@ -162,7 +164,7 @@ const getBrickColor = (row) => {
   return { h: 240, s: 100, l: lightnessValues[row] };
 };
 
-// Funkcija za crtanje palice s efektom sjencanja
+// Funkcija za crtanje palice s efektom sjenčanja
 const drawPaddle = () => {
   // Konvertiranje boje u HSL string
   const baseColor = `hsl(${paddle.color.h}, ${paddle.color.s}%, ${paddle.color.l}%)`;
@@ -192,7 +194,7 @@ const drawBall = () => {
   ctx.closePath();
 };
 
-// Funkcija za crtanje cigli s efektom sjencanja
+// Funkcija za crtanje cigli s efektom sjenčanja
 const drawBricks = () => {
   for (let r = 0; r < brick.rowCount; r++) {
     for (let c = 0; c < brick.columnCount; c++) {
@@ -266,7 +268,7 @@ const collisionDetection = (prevX, prevY) => {
           ball.y + ball.radius > b.y &&
           ball.y - ball.radius < b.y + brick.height
         ) {
-          // Odredi s koje strane je došlo do sudara koristeci prethodnu poziciju
+          // Odredi s koje strane je došlo do sudara koristeći prethodnu poziciju
           let collidedFromLeft = prevX + ball.radius <= b.x;
           let collidedFromRight = prevX - ball.radius >= b.x + brick.width;
           let collidedFromTop = prevY + ball.radius <= b.y;
@@ -289,10 +291,13 @@ const collisionDetection = (prevX, prevY) => {
             ball.y = b.y + brick.height + ball.radius;
             ball.jumpY = -ball.jumpY;
           } else {
-            // Ako ne mozemo odrediti stranu, promijenimo oba smjera
+            // Ako ne možemo odrediti stranu, promijenimo oba smjera
             ball.jumpX = -ball.jumpX;
             ball.jumpY = -ball.jumpY;
           }
+
+          // Nakon promjene smjera, normaliziramo brzinu
+          normalizeBallSpeed();
 
           b.status = 0;
           score += 1;
@@ -322,23 +327,15 @@ const update = () => {
     paddle.x += paddle.speed;
   }
 
-  // Ograničavanje brzine loptice
-  let speed = Math.sqrt(ball.jumpX * ball.jumpX + ball.jumpY * ball.jumpY);
-  if (speed > ball.maxSpeed) {
-    let scale = ball.maxSpeed / speed;
-    ball.jumpX *= scale;
-    ball.jumpY *= scale;
-  }
-
   // Podjela kretanja loptice na manje korake
-  let steps = Math.ceil(speed / 5);
+  let steps = Math.ceil(ball.speed / 5);
   let stepX = ball.jumpX / steps;
   let stepY = ball.jumpY / steps;
 
   let collisionHappened = false;
 
   for (let i = 0; i < steps; i++) {
-    // Sacuvaj prethodnu poziciju loptice
+    // Sačuvaj prethodnu poziciju loptice
     let prevX = ball.x;
     let prevY = ball.y;
 
@@ -350,33 +347,36 @@ const update = () => {
     if (ball.x - ball.radius < 0) {
       ball.x = ball.radius;
       ball.jumpX = -ball.jumpX;
-      stepX = -stepX; // Azuriraj stepX nakon promjene smjera
+      stepX = -stepX; // Ažuriraj stepX nakon promjene smjera
+      normalizeBallSpeed();
     } else if (ball.x + ball.radius > canvas.width) {
       ball.x = canvas.width - ball.radius;
       ball.jumpX = -ball.jumpX;
       stepX = -stepX;
+      normalizeBallSpeed();
     }
 
     if (ball.y - ball.radius < 0) {
       ball.y = ball.radius;
       ball.jumpY = -ball.jumpY;
-      stepY = -stepY; // Azuriraj stepY nakon promjene smjera
+      stepY = -stepY; // Ažuriraj stepY nakon promjene smjera
+      normalizeBallSpeed();
     } else if (ball.y + ball.radius > canvas.height) {
       // Sudar s donjim rubom ekrana
       if (ball.x > paddle.x && ball.x < paddle.x + paddle.width) {
-        // Izrazunaj relativnu poziciju udarca na palici (-1 do 1)
+        // Izračunaj relativnu poziciju udarca na palici (-1 do 1)
         let relativeHitPosition = (ball.x - paddle.x) / paddle.width - 0.5;
         relativeHitPosition *= 2;
 
-        // Postavi maksimalnu horizontalnu brzinu
-        let maxHorizontalSpeed = ball.maxSpeed;
+        // Ažuriraj horizontalnu brzinu loptice na temelju pozicije udarca
+        ball.jumpX = relativeHitPosition * ball.speed;
 
-        // Azuriraj horizontalnu brzinu loptice na temelju pozicije udarca
-        ball.jumpX = relativeHitPosition * maxHorizontalSpeed;
+        // Održavaj konstantnu vertikalnu brzinu prema gore
+        ball.jumpY = -Math.sqrt(
+          ball.speed * ball.speed - ball.jumpX * ball.jumpX
+        );
+
         stepX = ball.jumpX / steps;
-
-        // Odrzavaj konstantnu vertikalnu brzinu prema gore
-        ball.jumpY = -Math.abs(ball.jumpY);
         stepY = ball.jumpY / steps;
         ball.y = canvas.height - paddle.height - ball.radius; // Postavi lopticu iznad palice
       } else {
